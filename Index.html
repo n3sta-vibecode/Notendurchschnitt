@@ -11,6 +11,10 @@
   <link rel="apple-touch-icon" href="./icon-192x192.jpeg">
   <title>Notenrechner Gemini 3.1 Pro</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg-color: #f9fafb;
@@ -158,6 +162,12 @@
     .check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .check-row input { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; }
     .check-row label { margin: 0; font-weight: 500; cursor: pointer; }
+    .file-import { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .file-import-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .file-import-row button { flex: 1; min-width: 220px; }
+    .file-import-status { min-height: 18px; font-size: 0.82rem; color: var(--text-muted); }
+    .file-import-status.ok { color: #15803d; }
+    .file-import-status.err { color: #b91c1c; }
     button {
       display: inline-flex;
       align-items: center;
@@ -172,6 +182,7 @@
       transition: all 0.2s ease;
       font-family: inherit;
     }
+    button:disabled { opacity: 0.65; cursor: not-allowed; }
     .btn-blue { background: var(--primary); color: #fff; }
     .btn-blue:hover { background: var(--primary-hover); }
     .btn-green { background: var(--success); color: #fff; }
@@ -328,6 +339,13 @@
       <div class="section-title">Noten erfassen</div>
       <label for="gradeInput">Fach und Note(n)</label>
       <textarea id="gradeInput" placeholder="Z.B. Mathematik 5.5&#10;Deutsch 4&#10;Englisch 5"></textarea>
+      <div class="file-import">
+        <input type="file" id="gradeFileInput" accept="image/*,.pdf,.txt,.csv,.tsv,.md,.json,.html,.htm,.xml,.docx,.xlsx,.xls,.ods,text/plain,text/csv,application/pdf" multiple hidden>
+        <div class="file-import-row">
+          <button id="gradeFileBtn" type="button" class="btn-gray btn-full">Noten aus Datei (Bild oder Datei) einfügen</button>
+        </div>
+        <div id="gradeFileStatus" class="file-import-status" aria-live="polite"></div>
+      </div>
       <div class="row">
         <div>
           <label for="weight">Gewichtung</label>
@@ -412,7 +430,7 @@
 </div>
 
 <footer class="footer-bar">
-  <div class="footer-text">Gehostet mit Netlify - Software ist KI-generiert mit Claude (Anthropic) & Gemini</div>
+  <div class="footer-text">Gehostet mit Netlify - Software ist KI-generiert mit Claude (Anthropic), Gemini & GPT-5 (Codex)</div>
   <div class="footer-links">
     <a id="copyCodeLink">Code kopieren</a>
     <a id="downloadHtmlLink">HTML Datei exportieren</a>
@@ -474,6 +492,7 @@ const gradeInput=$('gradeInput'),weightInput=$('weight'),addBtn=$('addBtn'),
       gradeList=$('gradeList'),gradeCount=$('gradeCount'),calcBtn=$('calcBtn'),
       delAllBtn=$('delAllBtn'),avgResult=$('avgResult'),medResult=$('medResult'),
       msgBox=$('msgBox'),roundHalf=$('roundHalf'),pdfBtn=$('pdfBtn'),pdfCompact=$('pdfCompact');
+const gradeFileInput=$('gradeFileInput'),gradeFileBtn=$('gradeFileBtn'),gradeFileStatus=$('gradeFileStatus');
 const targetGradeIn=$('targetGrade'),futureWeightIn=$('futureWeight'),
       futureCountIn=$('futureCount'),targetBtn=$('targetBtn'),
       targetResult=$('targetResult'),targetGradeDisp=$('targetGradeDisp'),
@@ -492,6 +511,347 @@ function showMsg(t,type='warn'){
   msgBox.style.display='block';
   msgBox.className='msg '+({warn:'warn',err:'err',ok:'ok'}[type]||'warn');
   setTimeout(()=>msgBox.style.display='none',4000);
+}
+
+function setFileStatus(text,type=''){
+  gradeFileStatus.textContent=text||'';
+  gradeFileStatus.className='file-import-status '+(type||'');
+}
+
+function setFileBusy(isBusy){
+  gradeFileBtn.disabled=isBusy;
+  gradeFileInput.disabled=isBusy;
+  gradeFileBtn.textContent=isBusy?'Datei wird gelesen...':'Noten aus Datei (Bild oder Datei) einfügen';
+}
+
+function normalizeImportedText(text){
+  return String(text||'')
+    .replace(/\r/g,'\n')
+    .replace(/[ \t]+\n/g,'\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
+}
+
+function insertIntoGradeInput(text){
+  const cleaned=normalizeImportedText(text);
+  if(!cleaned)throw new Error('In der Datei wurde kein lesbarer Text gefunden.');
+  const before=gradeInput.value.trimEnd();
+  gradeInput.value=before?before+'\n'+cleaned:cleaned;
+  gradeInput.focus();
+  gradeInput.setSelectionRange(gradeInput.value.length,gradeInput.value.length);
+}
+
+function isTextLikeFile(file){
+  const name=file.name.toLowerCase();
+  return file.type.startsWith('text/')||/\.(txt|csv|tsv|md|json|html?|xml)$/i.test(name);
+}
+
+function normalizeGradeTokenText(text){
+  const raw=String(text||'').trim();
+  if(!/[0-9OoIl|,.]/.test(raw))return raw;
+  return raw
+    .replace(/[Oo]/g,'0')
+    .replace(/[Il|]/g,'1')
+    .replace(/,/g,'.')
+    .trim();
+}
+
+function findGradeMatches(text){
+  const source=String(text||'');
+  const tokenRx=/(^|[^0-9A-Za-zÀ-ÿÄÖÜäöüÉÈÊéèêÇç])([0-9OoIl|]{1,2}(?:[,.][0-9OoIl|]{1,3})?)(?=$|[^0-9A-Za-zÀ-ÿÄÖÜäöüÉÈÊéèêÇç])/g;
+  const matches=[];
+  let m;
+  while((m=tokenRx.exec(source))){
+    const token=normalizeGradeTokenText(m[2]);
+    let raw='';
+    if(/^[1-6](?:[.]\d{1,3})?$/.test(token))raw=token;
+    else if(/^[1-6][05]$/.test(token))raw=token[0]+'.'+token[1];
+    if(!raw)continue;
+    const n=parseFloat(raw);
+    if(Number.isFinite(n)&&n>=1&&n<=6){
+      const index=m.index+m[1].length;
+      matches.push({text:raw,grade:n,index,end:m.index+m[0].length});
+    }
+  }
+  matches.sort((a,b)=>a.index-b.index);
+  return matches;
+}
+
+function looksLikeGradeText(text){
+  return findGradeMatches(text).length>0;
+}
+
+function cleanSubjectName(text){
+  return String(text||'')
+    .replace(/[|_]+/g,' ')
+    .replace(/^[\s:;,\-.–—]+|[\s:;,\-.–—]+$/g,'')
+    .replace(/\s{2,}/g,' ')
+    .trim();
+}
+
+function num(v){
+  const n=parseFloat(v);
+  return Number.isFinite(n)?n:NaN;
+}
+
+function getWordBox(word){
+  const b=word&&word.bbox?word.bbox:word;
+  if(!b)return null;
+  const x0=num(b.x0 ?? b.left);
+  const y0=num(b.y0 ?? b.top);
+  let x1=num(b.x1);
+  let y1=num(b.y1);
+  const width=num(b.width);
+  const height=num(b.height);
+  if(!Number.isFinite(x1)&&Number.isFinite(x0)&&Number.isFinite(width))x1=x0+width;
+  if(!Number.isFinite(y1)&&Number.isFinite(y0)&&Number.isFinite(height))y1=y0+height;
+  if([x0,y0,x1,y1].some(v=>!Number.isFinite(v))||x1<=x0||y1<=y0)return null;
+  return {x0,y0,x1,y1,cx:(x0+x1)/2,cy:(y0+y1)/2,w:x1-x0,h:y1-y0};
+}
+
+function extractOcrWords(data){
+  const out=[];
+  const pushWord=word=>{
+    const text=String(word&&word.text||'').replace(/[|_]+/g,' ').trim();
+    if(!text)return;
+    const box=getWordBox(word);
+    if(!box)return;
+    out.push({...box,text,conf:num(word.confidence ?? word.conf ?? 0)});
+  };
+  if(data&&Array.isArray(data.words))data.words.forEach(pushWord);
+  if(!out.length&&data&&Array.isArray(data.lines)){
+    data.lines.forEach(line=>{
+      if(Array.isArray(line.words))line.words.forEach(pushWord);
+    });
+  }
+  if(!out.length&&data&&typeof data.tsv==='string'){
+    const rows=data.tsv.trim().split(/\r?\n/);
+    const headers=(rows.shift()||'').split('\t');
+    const idx=Object.fromEntries(headers.map((h,i)=>[h,i]));
+    rows.forEach(row=>{
+      const cols=row.split('\t');
+      if(cols[idx.level]!=='5')return;
+      const text=cols[idx.text]||'';
+      pushWord({
+        text,
+        left:cols[idx.left],
+        top:cols[idx.top],
+        width:cols[idx.width],
+        height:cols[idx.height],
+        conf:cols[idx.conf]
+      });
+    });
+  }
+  return out;
+}
+
+function groupWordsByRows(words){
+  if(!words.length)return [];
+  const sorted=[...words].sort((a,b)=>a.cy-b.cy||a.x0-b.x0);
+  const avgH=sorted.reduce((sum,w)=>sum+w.h,0)/sorted.length;
+  const rows=[];
+  sorted.forEach(word=>{
+    let best=null,bestDist=Infinity;
+    rows.forEach(row=>{
+      const dist=Math.abs(word.cy-row.cy);
+      const overlap=Math.min(word.y1,row.y1)-Math.max(word.y0,row.y0);
+      const overlapRatio=overlap>0?overlap/Math.min(word.h,row.h):0;
+      if((dist<=Math.max(10,avgH*0.85)||overlapRatio>0.35)&&dist<bestDist){
+        best=row;bestDist=dist;
+      }
+    });
+    if(best)best.words.push(word);
+    else rows.push({words:[word]});
+    rows.forEach(row=>{
+      row.x0=Math.min(...row.words.map(w=>w.x0));
+      row.x1=Math.max(...row.words.map(w=>w.x1));
+      row.y0=Math.min(...row.words.map(w=>w.y0));
+      row.y1=Math.max(...row.words.map(w=>w.y1));
+      row.cy=row.words.reduce((sum,w)=>sum+w.cy,0)/row.words.length;
+      row.h=row.y1-row.y0;
+    });
+  });
+  return rows.map(row=>{
+    row.words.sort((a,b)=>a.x0-b.x0);
+    row.text=row.words.map(w=>w.text).join(' ');
+    return row;
+  }).sort((a,b)=>a.cy-b.cy);
+}
+
+function wordsToText(words){
+  return groupWordsByRows(words)
+    .map(row=>row.words.map(w=>w.text).join(' '))
+    .join(' ');
+}
+
+function median(values){
+  if(!values.length)return 0;
+  const sorted=[...values].sort((a,b)=>a-b);
+  const mid=Math.floor(sorted.length/2);
+  return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+}
+
+function findColumnSplit(words){
+  const minX=Math.min(...words.map(w=>w.x0));
+  const maxX=Math.max(...words.map(w=>w.x1));
+  const width=maxX-minX||1;
+  const gradeWords=words.filter(w=>looksLikeGradeText(w.text));
+  if(gradeWords.length){
+    const gradeMinX=Math.min(...gradeWords.map(w=>w.x0));
+    const leftMaxX=Math.max(...words.filter(w=>w.x1<gradeMinX).map(w=>w.x1));
+    if(Number.isFinite(leftMaxX)&&gradeMinX-leftMaxX>width*0.03)return (leftMaxX+gradeMinX)/2;
+    return Math.max(minX+width*0.45,gradeMinX-width*0.05);
+  }
+  const byX=[...words].sort((a,b)=>a.x0-b.x0);
+  let bestGap=0,bestSplit=minX+width*0.65;
+  for(let i=0;i<byX.length-1;i++){
+    const gap=byX[i+1].x0-byX[i].x1;
+    if(gap>bestGap){
+      bestGap=gap;
+      bestSplit=(byX[i].x1+byX[i+1].x0)/2;
+    }
+  }
+  return bestGap>width*0.08?bestSplit:minX+width*0.65;
+}
+
+function buildTwoColumnGradeText(data){
+  const words=extractOcrWords(data);
+  if(words.length<2)return '';
+  const splitX=findColumnSplit(words);
+  const leftWords=words.filter(w=>w.cx<splitX&&!looksLikeGradeText(w.text));
+  const rightRows=groupWordsByRows(words.filter(w=>w.cx>=splitX));
+  const gradeRows=rightRows.map(row=>{
+    const grades=findGradeMatches(row.text);
+    return {...row,gradeText:grades.map(g=>g.text).join(' ')};
+  }).filter(row=>row.gradeText);
+  if(!leftWords.length||!gradeRows.length)return '';
+  const gaps=[];
+  for(let i=1;i<gradeRows.length;i++)gaps.push(gradeRows[i].cy-gradeRows[i-1].cy);
+  const fallbackGap=Math.max(40,median(words.map(w=>w.h))*4);
+  const rowGap=median(gaps)||fallbackGap;
+  const lines=[];
+  gradeRows.forEach((row,i)=>{
+    const top=i===0?row.cy-rowGap/2:(gradeRows[i-1].cy+row.cy)/2;
+    const bottom=i===gradeRows.length-1?row.cy+rowGap/2:(row.cy+gradeRows[i+1].cy)/2;
+    const subject=cleanSubjectName(wordsToText(leftWords.filter(w=>w.cy>=top&&w.cy<bottom)));
+    lines.push((subject||'Unbekannt')+' '+row.gradeText);
+  });
+  return lines.join('\n');
+}
+
+function pdfTextContentToWords(content){
+  const words=[];
+  (content.items||[]).forEach(item=>{
+    const text=String(item.str||'').trim();
+    if(!text||!item.transform)return;
+    const x0=num(item.transform[4]);
+    const yPdf=num(item.transform[5]);
+    const width=Math.max(num(item.width),text.length*5);
+    const height=Math.max(num(item.height),8);
+    if(!Number.isFinite(x0)||!Number.isFinite(yPdf))return;
+    words.push({text,bbox:{x0,y0:-yPdf,x1:x0+width,y1:-yPdf+height}});
+  });
+  return words;
+}
+
+async function recognizeWithTesseract(imageLike,label){
+  if(!window.Tesseract)throw new Error('Tesseract.js konnte nicht geladen werden.');
+  const psm=window.Tesseract&&Tesseract.PSM?Tesseract.PSM.SPARSE_TEXT:'11';
+  const result=await Tesseract.recognize(imageLike,'deu+eng',{
+    langPath:'https://tessdata.projectnaptha.com/4.0.0',
+    workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    tessedit_pageseg_mode:psm,
+    preserve_interword_spaces:'1',
+    logger:m=>{
+      if(!m||!m.status)return;
+      if(m.status==='recognizing text'&&typeof m.progress==='number'){
+        setFileStatus(label+': OCR '+Math.round(m.progress*100)+'%');
+      }else{
+        setFileStatus(label+': '+m.status);
+      }
+    }
+  });
+  if(!result||!result.data)return '';
+  const tableText=buildTwoColumnGradeText(result.data);
+  if(tableText){
+    setFileStatus(label+': Fächer und Noten zusammengeführt');
+    return tableText;
+  }
+  return result.data.text||'';
+}
+
+async function extractPdfText(file){
+  if(!window.pdfjsLib)throw new Error('PDF.js konnte nicht geladen werden.');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const parts=[];
+  for(let pageNo=1;pageNo<=pdf.numPages;pageNo++){
+    setFileStatus(file.name+': PDF-Seite '+pageNo+' von '+pdf.numPages+' wird gelesen');
+    const page=await pdf.getPage(pageNo);
+    let directText='';
+    try{
+      const content=await page.getTextContent();
+      const directTableText=buildTwoColumnGradeText({words:pdfTextContentToWords(content)});
+      if(directTableText){
+        parts.push(directTableText);
+        continue;
+      }
+      directText=content.items.map(item=>item.str).join(' ');
+    }catch{}
+    if(normalizeImportedText(directText).length>8){
+      parts.push(directText);
+      continue;
+    }
+    const baseViewport=page.getViewport({scale:1});
+    const scale=Math.min(2.4,Math.max(1.4,1800/baseViewport.width));
+    const viewport=page.getViewport({scale});
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.ceil(viewport.width);
+    canvas.height=Math.ceil(viewport.height);
+    const ctx=canvas.getContext('2d',{alpha:false});
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    await page.render({canvasContext:ctx,viewport}).promise;
+    parts.push(await recognizeWithTesseract(canvas,file.name+' Seite '+pageNo+' von '+pdf.numPages));
+    canvas.width=0;
+    canvas.height=0;
+  }
+  return parts.join('\n\n');
+}
+
+async function extractDocxText(file){
+  if(!window.mammoth)throw new Error('Word-Dateien können nicht gelesen werden, weil Mammoth.js nicht geladen ist.');
+  const result=await mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+  return result.value||'';
+}
+
+async function extractSpreadsheetText(file){
+  if(!window.XLSX)throw new Error('Tabellendateien können nicht gelesen werden, weil SheetJS nicht geladen ist.');
+  const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+  return workbook.SheetNames.map(name=>{
+    const csv=XLSX.utils.sheet_to_csv(workbook.Sheets[name],{FS:' ',blankrows:false});
+    return name+'\n'+csv;
+  }).join('\n\n');
+}
+
+async function extractTextFromFile(file){
+  const name=file.name.toLowerCase();
+  if(file.type.startsWith('image/')||/\.(png|jpe?g|webp|bmp|gif|tiff?)$/i.test(name)){
+    return await recognizeWithTesseract(file,file.name);
+  }
+  if(file.type==='application/pdf'||/\.pdf$/i.test(name)){
+    return await extractPdfText(file);
+  }
+  if(/\.docx$/i.test(name)){
+    return await extractDocxText(file);
+  }
+  if(/\.(xlsx|xls|ods)$/i.test(name)){
+    return await extractSpreadsheetText(file);
+  }
+  if(isTextLikeFile(file)){
+    return await file.text();
+  }
+  throw new Error('Dieses Dateiformat wird noch nicht unterstützt.');
 }
 
 // ─── OPFS Helfer (mit localStorage-Fallback für Safari < 17.2) ──────────────
@@ -600,7 +960,7 @@ async function loadG(){
   }
 }
 
-function parse(inp){
+function parseKnownSubjects(inp){
   const res=[];let rem=inp.trim(),cur=null;
   while(rem.length){
     let found=null;
@@ -623,6 +983,41 @@ function parse(inp){
     }
   }
   return res;
+}
+
+function parseLineBased(inp){
+  const res=[];
+  let current=null;
+  String(inp||'').split(/\r?\n|;/).forEach(rawLine=>{
+    const line=rawLine.trim();
+    if(!line)return;
+    const matches=findGradeMatches(line);
+    if(!matches.length){
+      const subjectOnly=cleanSubjectName(line);
+      if(subjectOnly)current=subjectOnly;
+      return;
+    }
+    const subjectPart=cleanSubjectName(line.slice(0,matches[0].index));
+    const subject=subjectPart||current||'Unbekannt';
+    if(subjectPart)current=subjectPart;
+    matches.forEach(match=>res.push({subject,grade:match.grade}));
+  });
+  return res;
+}
+
+function shouldUseLineParser(inp){
+  const text=String(inp||'').trim();
+  if(/[\r\n;]/.test(text))return true;
+  const matches=findGradeMatches(text);
+  if(matches.length<=1)return true;
+  const afterFirst=text.slice(matches[0].end);
+  return !SORTED_SUBJ.some(s=>new RegExp('\\b'+escRx(s)+'\\b','i').test(afterFirst));
+}
+
+function parse(inp){
+  const lineBased=parseLineBased(inp);
+  if(lineBased.length&&shouldUseLineParser(inp))return lineBased;
+  return parseKnownSubjects(inp);
 }
 
 function render(){
@@ -837,6 +1232,33 @@ gradeInput.onkeydown=e=>{
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addBtn.click()}
 };
 
+gradeFileBtn.onclick=()=>{
+  gradeFileInput.click();
+};
+
+gradeFileInput.onchange=async()=>{
+  const files=[...gradeFileInput.files];
+  if(!files.length)return;
+  setFileBusy(true);
+  try{
+    const texts=[];
+    for(const file of files){
+      setFileStatus(file.name+' wird gelesen');
+      texts.push(await extractTextFromFile(file));
+    }
+    insertIntoGradeInput(texts.join('\n\n'));
+    const count=files.length;
+    setFileStatus(count+' Datei'+(count>1?'en':'')+' ins Textfeld eingefügt','ok');
+    showMsg('Noten aus Datei ins Textfeld eingefügt','ok');
+  }catch(e){
+    setFileStatus(e.message||'Datei konnte nicht gelesen werden','err');
+    showMsg(e.message||'Datei konnte nicht gelesen werden','err');
+  }finally{
+    gradeFileInput.value='';
+    setFileBusy(false);
+  }
+};
+
 // ─── HTML Download mit vollständigem Dokument ─────────────────────────────────
 function getFullHtml(){
   // Kompletten Quellcode der Seite zusammenbauen
@@ -1042,14 +1464,16 @@ async function shareHtmlFile(filename){
   return false;
 }
 
-zielHtmlBtn.onclick=async()=>{
-  try{
-    await shareHtmlFile('Notenrechner_Zielrechner.html');
-  }catch(e){
-    if(e&&e.name==='AbortError')return;
-    showMsg('Export fehlgeschlagen','err');
-  }
-};
+if(zielHtmlBtn){
+  zielHtmlBtn.onclick=async()=>{
+    try{
+      await shareHtmlFile('Notenrechner_Zielrechner.html');
+    }catch(e){
+      if(e&&e.name==='AbortError')return;
+      showMsg('Export fehlgeschlagen','err');
+    }
+  };
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 (async function init(){
