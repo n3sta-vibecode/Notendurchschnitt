@@ -498,6 +498,32 @@ const gradeInput=$('gradeInput'),weightInput=$('weight'),addBtn=$('addBtn'),
       delAllBtn=$('delAllBtn'),avgResult=$('avgResult'),medResult=$('medResult'),
       msgBox=$('msgBox'),roundHalf=$('roundHalf'),pdfBtn=$('pdfBtn'),pngBtn=$('pngBtn'),pdfCompact=$('pdfCompact');
 const gradeFileInput=$('gradeFileInput'),gradeFileBtn=$('gradeFileBtn'),gradeFileStatus=$('gradeFileStatus');
+
+// ─── Gewichtungsfeld: automatischer Abstand nach jeder Ziffer ────────────────
+// (ausser wenn direkt danach ein Dezimalpunkt/Komma folgt)
+weightInput.addEventListener('beforeinput',e=>{
+  if(e.inputType!=='insertText'||!e.data||e.data.length!==1||!/[0-9]/.test(e.data))return;
+  const el=e.target;
+  const start=el.selectionStart,end=el.selectionEnd;
+  const val=el.value;
+  const before=val.slice(0,start);
+  const after=val.slice(end);
+  const lastSpace=before.lastIndexOf(' ');
+  const token=before.slice(lastSpace+1);
+  const sepIdx=token.search(/[.,]/);
+  let needsSpace;
+  if(sepIdx===-1){
+    needsSpace=token.length>0&&/[0-9]$/.test(token);
+  }else{
+    const frac=token.slice(sepIdx+1);
+    needsSpace=frac.length>=3;
+  }
+  e.preventDefault();
+  const insert=(needsSpace?' ':'')+e.data;
+  el.value=before+insert+after;
+  const pos=before.length+insert.length;
+  el.setSelectionRange(pos,pos);
+});
 const targetGradeIn=$('targetGrade'),futureWeightIn=$('futureWeight'),
       futureCountIn=$('futureCount'),targetBtn=$('targetBtn'),
       targetResult=$('targetResult'),targetGradeDisp=$('targetGradeDisp'),
