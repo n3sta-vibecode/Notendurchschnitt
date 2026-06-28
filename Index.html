@@ -133,7 +133,7 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
-    input[type="number"], textarea {
+    input[type="number"], input[type="text"], textarea {
       width: 100%;
       padding: 12px 16px;
       border: 1px solid var(--border-color);
@@ -186,8 +186,8 @@
     .btn-blue { background: var(--primary); color: #fff; }
     .btn-blue:hover { background: var(--primary-hover); }
     .btn-green { background: var(--success); color: #fff; }
-    .btn-red { background: #fff; border: 1px solid var(--danger); color: var(--danger); }
-    .btn-red:hover { background: #fef2f2; }
+    .btn-red { background: var(--danger); border: 1px solid var(--danger); color: #fff; }
+    .btn-red:hover { background: #dc2626; border-color: #dc2626; }
     .btn-purple { background: #8b5cf6; color: #fff; }
     .btn-dark { background: #1f2937; color: #fff; }
     .btn-gray { background: #f3f4f6; color: #374151; border: 1px solid var(--border-color); }
@@ -299,7 +299,7 @@
     .footer-links a:hover { color: #1e40af; }
   </style>
 </head>
-<body>
+<body class="pwa-mode">
 
 
 
@@ -312,18 +312,18 @@
     Notenrechner
   </div>
   <button id="installBtn">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v13M6 10l6 6 6-6"/><path d="M3 19h18v2H3z"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v13M6 10l6 6 6-6"></path><path d="M3 19h18v2H3z"></path></svg>
     Installieren
   </button>
   <div class="system-select">
     <svg class="eu-flag" viewBox="0 0 810 540">
-      <rect fill="#003399" width="810" height="540"/>
+      <rect fill="#003399" width="810" height="540"></rect>
       <g fill="#FFCC00">
-        <g id="s"><g id="c"><path d="M405,60l9.6,29.5h31l-25.1,18.2,9.6,29.5-25.1-18.2-25.1,18.2,9.6-29.5-25.1-18.2h31z"/></g>
-          <use href="#c" transform="rotate(30 405 270)"/><use href="#c" transform="rotate(60 405 270)"/>
-          <use href="#c" transform="rotate(90 405 270)"/><use href="#c" transform="rotate(120 405 270)"/>
-          <use href="#c" transform="rotate(150 405 270)"/></g>
-        <use href="#s" transform="rotate(180 405 270)"/>
+        <g id="s"><g id="c"><path d="M405,60l9.6,29.5h31l-25.1,18.2,9.6,29.5-25.1-18.2-25.1,18.2,9.6-29.5-25.1-18.2h31z"></path></g>
+          <use href="#c" transform="rotate(30 405 270)"></use><use href="#c" transform="rotate(60 405 270)"></use>
+          <use href="#c" transform="rotate(90 405 270)"></use><use href="#c" transform="rotate(120 405 270)"></use>
+          <use href="#c" transform="rotate(150 405 270)"></use></g>
+        <use href="#s" transform="rotate(180 405 270)"></use>
       </g>
     </svg>
     <select id="gradeSystem">
@@ -338,9 +338,11 @@
     <div class="card">
       <div class="section-title">Noten erfassen</div>
       <label for="gradeInput">Fach und Note(n)</label>
-      <textarea id="gradeInput" placeholder="Z.B. Mathematik 5.5&#10;Deutsch 4&#10;Englisch 5"></textarea>
+      <textarea id="gradeInput" placeholder="Z.B. Mathematik 5.5
+Deutsch 4
+Englisch 5"></textarea>
       <div class="file-import">
-        <input type="file" id="gradeFileInput" accept="image/*,.pdf,.txt,.csv,.tsv,.md,.json,.html,.htm,.xml,.docx,.xlsx,.xls,.ods,text/plain,text/csv,application/pdf" multiple hidden>
+        <input type="file" id="gradeFileInput" accept="image/*,.pdf,.txt,.csv,.tsv,.md,.json,.html,.htm,.xml,.docx,.xlsx,.xls,.ods,text/plain,text/csv,application/pdf" multiple="" hidden="">
         <div class="file-import-row">
           <button id="gradeFileBtn" type="button" class="btn-gray btn-full">Noten aus Datei (Bild oder Datei) einfügen</button>
         </div>
@@ -348,8 +350,8 @@
       </div>
       <div class="row">
         <div>
-          <label for="weight">Gewichtung</label>
-          <input type="number" id="weight" placeholder="1.000" step="0.001" min="0.001">
+          <label for="weight">Gewichtung (mehrere mit Leerzeichen trennen)</label>
+          <input type="text" id="weight" placeholder="z.B. 1   oder   1 2 1.5" inputmode="decimal">
         </div>
       </div>
       <div class="check-row">
@@ -381,7 +383,8 @@
         <div id="targetNote" class="target-note"></div>
       </div>
       <div class="ziel-btn-row" id="zielBtnRow" style="display:none">
-        <button id="zielPdfBtn" class="btn-dark">Als PDF exportieren</button>
+        <button id="zielPdfBtn" class="btn-dark">Als PDF</button>
+        <button id="zielPngBtn" class="btn-dark">Als PNG</button>
       </div>
     </div>
   </div>
@@ -398,12 +401,14 @@
         Eingetragene Noten
         <span id="gradeCount" class="count" style="display:none">0</span>
       </div>
-      <div id="gradeList" class="grade-list"></div>
+      <div id="gradeList" class="grade-list"><div class="empty">Bisher keine Noten eingetragen</div></div>
       <div class="btn-row">
-        <button id="calcBtn" class="btn-green">Aktualisieren</button>
-        <button id="delAllBtn" class="btn-red">Löschen</button>
+        <button id="delAllBtn" class="btn-red btn-full">Löschen</button>
       </div>
-      <button id="pdfBtn" class="btn-dark btn-full">Als PDF exportieren</button>
+      <div class="btn-row">
+        <button id="pdfBtn" class="btn-dark">Als PDF exportieren</button>
+        <button id="pngBtn" class="btn-dark">Als PNG exportieren</button>
+      </div>
       <div class="check-row" style="margin-top:8px;">
         <input type="checkbox" id="pdfCompact">
         <label for="pdfCompact">Nur Fach &amp; Note</label>
@@ -417,11 +422,11 @@
           <div class="toggle-sub">Noten im Browser lokal speichern</div>
         </div>
         <label class="toggle-switch">
-          <input type="checkbox" id="storageToggle" checked>
+          <input type="checkbox" id="storageToggle" checked="">
           <span class="toggle-slider"></span>
         </label>
       </div>
-      <div id="storageStatus" class="status on">Speicherung aktiv</div>
+      <div id="storageStatus" class="status off">Speicherung deaktiviert</div>
     </div>
 
 
@@ -430,7 +435,7 @@
 </div>
 
 <footer class="footer-bar">
-  <div class="footer-text">Gehostet mit Netlify - Software ist KI-generiert mit Claude (Anthropic), Gemini & GPT-5 (Codex)</div>
+  <div class="footer-text">Gehostet mit Netlify - Software ist KI-generiert mit Claude (Anthropic), Gemini &amp; GPT-5 (Codex)</div>
   <div class="footer-links">
     <a id="copyCodeLink">Code kopieren</a>
     <a id="downloadHtmlLink">HTML Datei exportieren</a>
@@ -489,9 +494,9 @@ let currentKey=null; // AES-256-GCM Sitzungsschlüssel (nur im Speicher)
 
 const $=id=>document.getElementById(id);
 const gradeInput=$('gradeInput'),weightInput=$('weight'),addBtn=$('addBtn'),
-      gradeList=$('gradeList'),gradeCount=$('gradeCount'),calcBtn=$('calcBtn'),
+      gradeList=$('gradeList'),gradeCount=$('gradeCount'),
       delAllBtn=$('delAllBtn'),avgResult=$('avgResult'),medResult=$('medResult'),
-      msgBox=$('msgBox'),roundHalf=$('roundHalf'),pdfBtn=$('pdfBtn'),pdfCompact=$('pdfCompact');
+      msgBox=$('msgBox'),roundHalf=$('roundHalf'),pdfBtn=$('pdfBtn'),pngBtn=$('pngBtn'),pdfCompact=$('pdfCompact');
 const gradeFileInput=$('gradeFileInput'),gradeFileBtn=$('gradeFileBtn'),gradeFileStatus=$('gradeFileStatus');
 const targetGradeIn=$('targetGrade'),futureWeightIn=$('futureWeight'),
       futureCountIn=$('futureCount'),targetBtn=$('targetBtn'),
@@ -1049,14 +1054,23 @@ function calc(){
   medResult.textContent=wmed.toFixed(3);
 }
 
+function parseWeights(raw){
+  const tokens=String(raw||'').trim().split(/\s+/).filter(Boolean);
+  if(!tokens.length)return [1];
+  const weights=tokens.map(t=>parseFloat(t.replace(',','.')));
+  if(weights.some(n=>!Number.isFinite(n)||n<=0))return null;
+  return weights;
+}
+
 addBtn.onclick=async()=>{
-  const w=weightInput.value.trim()===''?1:parseFloat(weightInput.value.replace(',','.'));
-  if(isNaN(w)||w<=0){showMsg('Gewichtung ungültig','err');return}
+  const weights=parseWeights(weightInput.value);
+  if(!weights){showMsg('Gewichtung ungültig','err');return}
   const txt=gradeInput.value.trim();
   if(!txt){showMsg('Eingabe fehlt','err');return}
   const parsed=parse(txt);let added=0,inv=0;
-  parsed.forEach(p=>{
+  parsed.forEach((p,i)=>{
     let g=p.grade;if(roundHalf.checked)g=rndHalf(g);
+    const w=i<weights.length?weights[i]:weights[weights.length-1];
     if(g>=1&&g<=6){grades.push({subject:p.subject,grade:g,weight:w});added++}else inv++;
   });
   if(added){await saveG();showMsg(added+' Note'+(added>1?'n':'')+' hinzugefügt','ok')}
@@ -1072,8 +1086,6 @@ delAllBtn.onclick=async()=>{
   }
 };
 
-calcBtn.onclick=calc;
-
 // ─── PDF Export Zähler ────────────────────────────────────────────────────────
 function nextPdfCount(key){
   const n=(parseInt(localStorage.getItem(key)||'0'))+1;
@@ -1085,131 +1097,185 @@ function fmtDate(){
 }
 
 // ─── PDF Export mit Logo-Header ───────────────────────────────────────────────
+function buildAvgPdfDoc(){
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF();
+  const dt=new Date().toLocaleDateString('de-CH');
+  const pageW=doc.internal.pageSize.getWidth();
+
+  // ── Logo-Header mit echtem Logo-Bild ────────────────────────────────────
+  try{
+    doc.addImage(LOGO_B64,'JPEG',15,10,55,18);
+  }catch(e){
+    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(17,24,39);
+    doc.text('Notenrechner',15,22);
+  }
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);
+  doc.text('notendurchschnitt.web.netlify.app',15,32);
+  // Trennlinie
+  doc.setDrawColor(229,231,235);
+  doc.setLineWidth(0.5);
+  doc.line(15,35,pageW-15,35);
+  // Datum rechts
+  doc.setTextColor(107,114,128);doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text('Erstellt: '+dt,pageW-15,20,{align:'right'});
+
+  // ── Inhaltsbereich ────────────────────────────────────────────────────────
+  let y=42;
+  const compact=pdfCompact.checked;
+  const grp={};
+  grades.forEach(g=>{
+    if(!grp[g.subject])grp[g.subject]=[];
+    grp[g.subject].push(g);
+  });
+
+  if(compact){
+    // ── Kompakt-Modus: nur Fach und Note(n) ────────────────────────────────
+    for(const s in grp){
+      const noten=grp[s].map(g=>g.grade.toFixed(2)).join('  |  ');
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(10);
+      doc.setTextColor(17,24,39);
+      doc.text(s,15,y);
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      doc.setTextColor(55,65,81);
+      doc.text(noten,pageW-15,y,{align:'right'});
+      y+=7;
+      if(y>275){doc.addPage();y=20}
+    }
+  }else{
+    // ── Detail-Modus: Noten mit Gewichtung und Fachschnitt ─────────────────
+    for(const s in grp){
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(11);
+      doc.setTextColor(17,24,39);
+      doc.text(s,15,y);
+      y+=6;
+
+      doc.setFont('helvetica','normal');
+      doc.setFontSize(10);
+      grp[s].forEach((g,i)=>{
+        doc.setTextColor(55,65,81);
+        doc.text('  Note '+(i+1)+':',15,y);
+        doc.setTextColor(17,24,39);
+        doc.text(g.grade.toFixed(3),50,y);
+        doc.setTextColor(107,114,128);
+        doc.text('Gewichtung: '+g.weight.toFixed(3),80,y);
+        y+=5;
+        if(y>275){doc.addPage();y=20}
+      });
+
+      let ss=0,sw=0;
+      grp[s].forEach(g=>{ss+=g.grade*g.weight;sw+=g.weight});
+      doc.setFont('helvetica','italic');
+      doc.setFontSize(9);
+      doc.setTextColor(79,70,229);
+      doc.text('  Fachschnitt: '+(ss/sw).toFixed(3),15,y);
+      y+=9;
+      if(y>275){doc.addPage();y=20}
+    }
+  }
+
+  // ── Gesamtergebnis ────────────────────────────────────────────────────────
+  y+=2;
+  doc.setDrawColor(229,231,235);
+  doc.setLineWidth(0.5);
+  doc.line(15,y,pageW-15,y);
+  y+=8;
+
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(12);
+  doc.setTextColor(17,24,39);
+  doc.text('Gesamtdurchschnitt: '+avgResult.textContent,15,y);
+  y+=7;
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(10);
+  doc.setTextColor(107,114,128);
+  doc.text('Median: '+medResult.textContent,15,y);
+
+  // ── Seitennummer ──────────────────────────────────────────────────────────
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pageCount;i++){
+    doc.setPage(i);
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(8);
+    doc.setTextColor(156,163,175);
+    doc.text('Seite '+i+' von '+pageCount,pageW/2,290,{align:'center'});
+  }
+  return doc;
+}
+
+// ─── Gemeinsamer Download/Teilen-Helfer ───────────────────────────────────────
+async function downloadOrShareBlob(blob,fn,mime,shareTitle){
+  if(navigator.share&&navigator.canShare){
+    const f=new File([blob],fn,{type:mime});
+    if(navigator.canShare({files:[f]})){
+      try{
+        await navigator.share({files:[f],title:shareTitle});
+        return;
+      }catch(e){
+        if(e&&e.name==='AbortError')return;
+      }
+    }
+  }
+  const u=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=u;a.download=fn;a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),5000);
+}
+
+// ─── PDF-Dokument als PNG rendern (über pdf.js) ───────────────────────────────
+async function pdfDocToPngBlob(doc){
+  if(!window.pdfjsLib)throw new Error('PDF.js nicht verfügbar');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const arrBuf=doc.output('arraybuffer');
+  const pdfDoc=await pdfjsLib.getDocument({data:new Uint8Array(arrBuf)}).promise;
+  const scale=2;
+  const pages=[];
+  let maxW=0,totalH=0;
+  for(let i=1;i<=pdfDoc.numPages;i++){
+    const page=await pdfDoc.getPage(i);
+    const viewport=page.getViewport({scale});
+    const c=document.createElement('canvas');
+    c.width=Math.ceil(viewport.width);
+    c.height=Math.ceil(viewport.height);
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+    await page.render({canvasContext:ctx,viewport}).promise;
+    pages.push(c);
+    maxW=Math.max(maxW,c.width);totalH+=c.height;
+  }
+  const combo=document.createElement('canvas');
+  combo.width=maxW;combo.height=totalH;
+  const cctx=combo.getContext('2d');
+  cctx.fillStyle='#ffffff';cctx.fillRect(0,0,combo.width,combo.height);
+  let y=0;
+  pages.forEach(c=>{cctx.drawImage(c,0,y);y+=c.height});
+  return await new Promise(resolve=>combo.toBlob(resolve,'image/png'));
+}
+
 pdfBtn.onclick=async()=>{
   if(!grades.length){showMsg('Keine Noten zum Exportieren','err');return}
   if(!window.jspdf){showMsg('PDF nicht verfügbar','err');return}
   try{
-    const{jsPDF}=window.jspdf;
-    const doc=new jsPDF();
-    const dt=new Date().toLocaleDateString('de-CH');
-    const pageW=doc.internal.pageSize.getWidth();
-
-    // ── Logo-Header mit echtem Logo-Bild ────────────────────────────────────
-    try{
-      doc.addImage(LOGO_B64,'JPEG',15,10,55,18);
-    }catch(e){
-      doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(17,24,39);
-      doc.text('Notenrechner',15,22);
-    }
-    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(107,114,128);
-    doc.text('notendurchschnitt.web.netlify.app',15,32);
-    // Trennlinie
-    doc.setDrawColor(229,231,235);
-    doc.setLineWidth(0.5);
-    doc.line(15,35,pageW-15,35);
-    // Datum rechts
-    doc.setTextColor(107,114,128);doc.setFontSize(9);doc.setFont('helvetica','normal');
-    doc.text('Erstellt: '+dt,pageW-15,20,{align:'right'});
-
-    // ── Inhaltsbereich ────────────────────────────────────────────────────────
-    let y=42;
-    const compact=pdfCompact.checked;
-    const grp={};
-    grades.forEach(g=>{
-      if(!grp[g.subject])grp[g.subject]=[];
-      grp[g.subject].push(g);
-    });
-
-    if(compact){
-      // ── Kompakt-Modus: nur Fach und Note(n) ────────────────────────────────
-      for(const s in grp){
-        const noten=grp[s].map(g=>g.grade.toFixed(2)).join('  |  ');
-        doc.setFont('helvetica','bold');
-        doc.setFontSize(10);
-        doc.setTextColor(17,24,39);
-        doc.text(s,15,y);
-        doc.setFont('helvetica','normal');
-        doc.setFontSize(10);
-        doc.setTextColor(55,65,81);
-        doc.text(noten,pageW-15,y,{align:'right'});
-        y+=7;
-        if(y>275){doc.addPage();y=20}
-      }
-    }else{
-      // ── Detail-Modus: Noten mit Gewichtung und Fachschnitt ─────────────────
-      for(const s in grp){
-        doc.setFont('helvetica','bold');
-        doc.setFontSize(11);
-        doc.setTextColor(17,24,39);
-        doc.text(s,15,y);
-        y+=6;
-
-        doc.setFont('helvetica','normal');
-        doc.setFontSize(10);
-        grp[s].forEach((g,i)=>{
-          doc.setTextColor(55,65,81);
-          doc.text('  Note '+(i+1)+':',15,y);
-          doc.setTextColor(17,24,39);
-          doc.text(g.grade.toFixed(3),50,y);
-          doc.setTextColor(107,114,128);
-          doc.text('Gewichtung: '+g.weight.toFixed(3),80,y);
-          y+=5;
-          if(y>275){doc.addPage();y=20}
-        });
-
-        let ss=0,sw=0;
-        grp[s].forEach(g=>{ss+=g.grade*g.weight;sw+=g.weight});
-        doc.setFont('helvetica','italic');
-        doc.setFontSize(9);
-        doc.setTextColor(79,70,229);
-        doc.text('  Fachschnitt: '+(ss/sw).toFixed(3),15,y);
-        y+=9;
-        if(y>275){doc.addPage();y=20}
-      }
-    }
-
-    // ── Gesamtergebnis ────────────────────────────────────────────────────────
-    y+=2;
-    doc.setDrawColor(229,231,235);
-    doc.setLineWidth(0.5);
-    doc.line(15,y,pageW-15,y);
-    y+=8;
-
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(12);
-    doc.setTextColor(17,24,39);
-    doc.text('Gesamtdurchschnitt: '+avgResult.textContent,15,y);
-    y+=7;
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(10);
-    doc.setTextColor(107,114,128);
-    doc.text('Median: '+medResult.textContent,15,y);
-
-    // ── Seitennummer ──────────────────────────────────────────────────────────
-    const pageCount=doc.internal.getNumberOfPages();
-    for(let i=1;i<=pageCount;i++){
-      doc.setPage(i);
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(8);
-      doc.setTextColor(156,163,175);
-      doc.text('Seite '+i+' von '+pageCount,pageW/2,290,{align:'center'});
-    }
-
+    const doc=buildAvgPdfDoc();
     const fn='Durchschnitt-'+fmtDate()+'-'+nextPdfCount('ng_pdf_avg')+'.pdf';
-    const blob=doc.output('blob');
-
-    if(navigator.share&&navigator.canShare){
-      const f=new File([blob],fn,{type:'application/pdf'});
-      if(navigator.canShare({files:[f]})){
-        try{await navigator.share({files:[f]});return}catch(e){}
-      }
-    }
-    const u=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=u;a.download=fn;a.click();
-    setTimeout(()=>URL.revokeObjectURL(u),5000);
+    await downloadOrShareBlob(doc.output('blob'),fn,'application/pdf','Notenrechner PDF');
     showMsg('PDF erstellt','ok');
   }catch(e){showMsg('PDF Fehler: '+e.message,'err')}
+};
+
+pngBtn.onclick=async()=>{
+  if(!grades.length){showMsg('Keine Noten zum Exportieren','err');return}
+  if(!window.jspdf){showMsg('PDF nicht verfügbar','err');return}
+  try{
+    const doc=buildAvgPdfDoc();
+    const pngBlob=await pdfDocToPngBlob(doc);
+    const fn='Durchschnitt-'+fmtDate()+'-'+nextPdfCount('ng_png_avg')+'.png';
+    await downloadOrShareBlob(pngBlob,fn,'image/png','Notenrechner PNG');
+    showMsg('PNG erstellt','ok');
+  }catch(e){showMsg('PNG Fehler: '+e.message,'err')}
 };
 
 targetBtn.onclick=()=>{
@@ -1328,6 +1394,7 @@ storageToggle.onchange=async()=>{
 // ─── Zielrechner PDF & HTML Export ────────────────────────────────────────────
 const zielBtnRow=document.getElementById('zielBtnRow');
 const zielPdfBtn=document.getElementById('zielPdfBtn');
+const zielPngBtn=document.getElementById('zielPngBtn');
 const zielHtmlBtn=document.getElementById('zielHtmlBtn');
 
 // Zielrechner-Ergebnis anzeigen + Buttons sichtbar machen
@@ -1429,28 +1496,29 @@ zielPdfBtn.onclick=async()=>{
     const subjects=[...new Set(grades.map(g=>g.subject))];
     const fachPart=subjects.length===1?'-'+subjects[0].replace(/[/\\?%*:|"<>]/g,'_'):'';
     const fn='Zielnote'+fachPart+'-'+fmtDate()+'-'+nextPdfCount('ng_pdf_ziel')+'.pdf';
-    const blob=doc.output('blob');
-    if(navigator.share&&navigator.canShare){
-      const f=new File([blob],fn,{type:'application/pdf'});
-      if(navigator.canShare({files:[f]})){
-        try{
-          await navigator.share({files:[f],title:'Zielrechner PDF'});
-          showMsg('PDF exportiert','ok');
-          return;
-        }catch(e){
-          if(e&&e.name==='AbortError')return;
-        }
-      }
-    }
-    const u=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=u;a.download=fn;a.click();
-    setTimeout(()=>URL.revokeObjectURL(u),5000);
+    await downloadOrShareBlob(doc.output('blob'),fn,'application/pdf','Zielrechner PDF');
     showMsg('PDF exportiert','ok');
   }catch(e){
     showMsg('PDF Fehler: '+e.message,'err')
   }
 };
+
+if(zielPngBtn){
+  zielPngBtn.onclick=async()=>{
+    if(!window.jspdf){showMsg('PDF nicht verfügbar','err');return}
+    try{
+      const doc=buildZielPdfDoc();
+      const pngBlob=await pdfDocToPngBlob(doc);
+      const subjects=[...new Set(grades.map(g=>g.subject))];
+      const fachPart=subjects.length===1?'-'+subjects[0].replace(/[/\\?%*:|"<>]/g,'_'):'';
+      const fn='Zielnote'+fachPart+'-'+fmtDate()+'-'+nextPdfCount('ng_png_ziel')+'.png';
+      await downloadOrShareBlob(pngBlob,fn,'image/png','Zielrechner PNG');
+      showMsg('PNG exportiert','ok');
+    }catch(e){
+      showMsg('PNG Fehler: '+e.message,'err')
+    }
+  };
+}
 
 async function shareHtmlFile(filename){
   const code=getFullHtml();
@@ -1489,5 +1557,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   }
 });
 </script>
+
+
 </body>
 </html>
